@@ -144,9 +144,65 @@ if "resumen" not in st.session_state:
     st.session_state.resumen = {}
 
 # ---------------------------------------------------------------------------
+# ESTILOS GLOBALES (funcionan en tema claro y oscuro, usan variables de Streamlit)
+# ---------------------------------------------------------------------------
+st.markdown(
+    """
+    <style>
+    /* ---- Menú lateral ---- */
+    section[data-testid="stSidebar"] {
+        border-right: 1px solid var(--gray-30, rgba(128,128,128,0.25));
+    }
+    section[data-testid="stSidebar"] > div {
+        padding-top: 0.5rem;
+    }
+    .menu-titulo {
+        font-size: 1.15rem;
+        font-weight: 700;
+        padding: 0.4rem 0 0.2rem 0;
+        margin-bottom: 0.3rem;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] {
+        gap: 0.35rem;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label {
+        background-color: var(--secondary-background-color);
+        border: 1px solid rgba(128, 128, 128, 0.25);
+        border-radius: 10px;
+        padding: 0.55rem 0.8rem;
+        width: 100%;
+        transition: all 0.15s ease-in-out;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label:hover {
+        border-color: var(--primary-color);
+        transform: translateX(2px);
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label div p {
+        font-size: 0.95rem;
+        font-weight: 500;
+    }
+    section[data-testid="stSidebar"] div[role="radiogroup"] label[data-checked="true"] {
+        background-color: color-mix(in srgb, var(--primary-color) 18%, transparent);
+        border-color: var(--primary-color);
+    }
+    /* ---- Recuadros "cómo resolver" ---- */
+    .metodo-box {
+        border: 1px solid rgba(128, 128, 128, 0.3);
+        border-left: 4px solid var(--primary-color);
+        border-radius: 8px;
+        padding: 0.9rem 1.1rem;
+        margin: 0.6rem 0 1rem 0;
+        background-color: var(--secondary-background-color);
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+# ---------------------------------------------------------------------------
 # MENÚ DE NAVEGACIÓN
 # ---------------------------------------------------------------------------
-st.sidebar.title("💹 Navegación")
+st.sidebar.markdown('<div class="menu-titulo">💹 Navegación</div>', unsafe_allow_html=True)
 pagina = st.sidebar.radio(
     "Ir a:",
     [
@@ -156,6 +212,7 @@ pagina = st.sidebar.radio(
         "3️⃣ Parte III - Sistemas de ecuaciones",
         "✅ Conclusión integradora",
     ],
+    label_visibility="collapsed",
 )
 
 st.sidebar.markdown("---")
@@ -222,6 +279,28 @@ Calcule el error absoluto, relativo y relativo porcentual para cada dato.
 """
     )
 
+    with st.expander("📐 Ver método de solución (cómo se resuelve)"):
+        st.markdown(
+            """
+            <div class="metodo-box">
+
+**Pasos para calcular los tres errores de un dato:**
+
+1. Identifica el **valor real** (de referencia) y el **valor aproximado** (registrado).
+2. Calcula el **error absoluto**: resta ambos valores y toma el valor absoluto,
+   Eₐ = |x_real − x_aproximado|.
+3. Calcula el **error relativo** dividiendo el error absoluto entre el valor real,
+   Eᵣ = Eₐ / |x_real| (indica qué tan grande es el error en proporción al valor real).
+4. Convierte el error relativo a **porcentaje** multiplicando por 100: E% = Eᵣ × 100.
+
+**Ejemplo:** si x_real = 12 500 y x_aproximado = 12 420 →
+Eₐ = |12500 − 12420| = 80 → Eᵣ = 80 / 12500 = 0.0064 → E% = 0.64 %.
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
     st.subheader("📋 Datos financieros (editables)")
     datos_default = pd.DataFrame(
         {
@@ -263,14 +342,8 @@ Calcule el error absoluto, relativo y relativo porcentual para cada dato.
 
         st.subheader("📊 Resultados")
 
-        def resaltar_max(s):
-            if s.name == "Error porcentual (E%)":
-                es_max = s == s.max()
-                return ["background-color:#ffcccc" if v else "" for v in es_max]
-            return ["" for _ in s]
-
         st.dataframe(
-            resultado.style.apply(resaltar_max, axis=0).format(
+            resultado.style.format(
                 {
                     "Valor real": "{:.2f}",
                     "Valor aproximado": "{:.2f}",
@@ -299,12 +372,6 @@ recorte de gastos basadas en información distorsionada — incluso si el error 
 parece pequeño en términos absolutos.
 """
         )
-        comentario = st.text_area(
-            "Agrega tu propia explicación (2-3 líneas) sobre cómo este error puede afectar una decisión financiera:",
-            key="conclusion_parte1",
-        )
-        if comentario:
-            st.session_state.resumen["conclusion_1"] = comentario
 
 # ---------------------------------------------------------------------------
 # PÁGINA: PARTE II - TAYLOR
@@ -322,6 +389,28 @@ Por defecto: P = 10 000, r = 0.05, expandiendo alrededor de **t₀ = 1 año** pa
 el capital en **t = 1.5 años** (valores de la guía original, editables abajo).
 """
     )
+
+    with st.expander("📐 Ver método de solución (cómo se resuelve)"):
+        st.markdown(
+            """
+            <div class="metodo-box">
+
+**Pasos para aproximar C(t) con la Serie de Taylor alrededor de t₀:**
+
+1. Escribe el polinomio de Taylor de orden *n*:
+   C(t) ≈ C(t₀) + C'(t₀)(t−t₀) + C''(t₀)/2!·(t−t₀)² + ... + C⁽ⁿ⁾(t₀)/n!·(t−t₀)ⁿ
+2. Como C(t) = P·e^(rt), todas sus derivadas son C⁽ᵏ⁾(t) = P·rᵏ·e^(rt), así que
+   C⁽ᵏ⁾(t₀) = P·rᵏ·e^(r·t₀).
+3. Calcula h = t − t₀ y arma cada término: C⁽ᵏ⁾(t₀)/k! · hᵏ.
+4. Suma los términos desde k = 0 hasta el orden elegido para obtener la aproximación.
+5. Compara contra el valor exacto C(t) = P·e^(rt) para medir el error de truncamiento.
+
+**A mayor orden, más términos de la serie se incluyen y menor es el error.**
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     col1, col2, col3, col4 = st.columns(4)
     with col1:
@@ -383,12 +472,6 @@ para horizontes cortos, pero subestiman o sobreestiman el crecimiento real del c
 si el intervalo (t − t₀) crece.
 """
         )
-        comentario2 = st.text_area(
-            "Agrega tu propia conclusión sobre qué orden de Taylor conviene usar y por qué:",
-            key="conclusion_parte2",
-        )
-        if comentario2:
-            st.session_state.resumen["conclusion_2"] = comentario2
 
 # ---------------------------------------------------------------------------
 # PÁGINA: PARTE III - SISTEMAS DE ECUACIONES
@@ -402,6 +485,37 @@ La empresa distribuye recursos entre áreas. Las incógnitas representan montos 
 (y x₄ = un área adicional, si eliges una matriz 4x4).
 """
     )
+
+    with st.expander("📐 Ver métodos de solución (cómo se resuelve cada uno)"):
+        st.markdown(
+            """
+            <div class="metodo-box">
+
+**Solución exacta (eliminación gaussiana):**
+Reduce la matriz aumentada [A | b] a forma escalonada usando operaciones entre filas
+hasta obtener un sistema triangular, y luego se despeja cada incógnita por sustitución
+hacia atrás. Da la solución exacta cuando A no es singular.
+
+**Factorización LU (con pivoteo parcial):**
+1. Descompone A en P·A = L·U (L triangular inferior, U triangular superior, P de permutación).
+2. Resuelve L·y = P·b por **sustitución hacia adelante**.
+3. Resuelve U·x = y por **sustitución hacia atrás**.
+Es eficiente cuando se debe resolver el sistema para varios vectores b.
+
+**Método de Jacobi (iterativo):**
+Despeja cada xᵢ de su propia ecuación usando los valores de la iteración **anterior**:
+xᵢ⁽ᵏ⁺¹⁾ = (bᵢ − Σⱼ≠ᵢ aᵢⱼ·xⱼ⁽ᵏ⁾) / aᵢᵢ.
+Se repite hasta que el cambio entre iteraciones sea menor a la tolerancia. Requiere que
+la matriz sea diagonal dominante para garantizar convergencia.
+
+**Método de Gauss-Seidel (iterativo):**
+Igual que Jacobi, pero usa los valores **ya actualizados** de xⱼ dentro de la misma
+iteración en lugar de esperar a la siguiente, por lo que normalmente converge más rápido.
+
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     col_a, col_b = st.columns(2)
     with col_a:
@@ -565,12 +679,6 @@ normalmente converge en menos iteraciones que Jacobi porque usa los valores actu
 de manera inmediata dentro de la misma iteración.
 """
             )
-        comentario3 = st.text_area(
-            "Agrega tu propia comparación/observación para este escenario:",
-            key="conclusion_parte3",
-        )
-        if comentario3:
-            st.session_state.resumen["conclusion_3"] = comentario3
 
     st.markdown("---")
     st.caption(
@@ -613,21 +721,12 @@ la aproximación de Taylor y el sistema mal condicionado.
     st.markdown(
         """
 Sí: un error pequeño en un dato financiero puede propagarse y producir un cambio
-importante en el resultado final. Los errores porcentuales de la Parte I muestran que
-incluso diferencias de pocas unidades ya son relevantes en términos relativos; la
-aproximación de Taylor confirma que truncar una serie introduce un error que crece con
-la distancia al punto de expansión; y el sistema mal condicionado de la Parte III
-demuestra que, cuando las ecuaciones son casi linealmente dependientes, ese mismo tipo
-de error pequeño se amplifica en la solución. En conjunto, esto obliga a la empresa a
+importante en el resultado final. Los errores porcentuales de la Parte I ya son
+relevantes en términos relativos; la aproximación de Taylor confirma que truncar una
+serie introduce un error que crece con la distancia al punto de expansión; y el sistema
+mal condicionado de la Parte III muestra que, con ecuaciones casi linealmente
+dependientes, ese error pequeño se amplifica en la solución. Por eso la empresa debe
 tratar sus datos financieros con controles de precisión adecuados antes de usarlos en
 decisiones de asignación de recursos.
 """
     )
-    conclusion_final = st.text_area(
-        "Escribe (o ajusta) tu conclusión final aquí:",
-        height=150,
-        key="conclusion_final",
-    )
-    if conclusion_final:
-        st.session_state.resumen["conclusion_final"] = conclusion_final
-        st.success("Conclusión guardada en la sesión.")
