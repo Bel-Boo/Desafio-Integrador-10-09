@@ -78,6 +78,40 @@ def lu_decomposition(A: np.ndarray):
     return P, L, U
 
 
+def lu_decomposition_pasos(A: np.ndarray):
+    """
+    Igual que lu_decomposition, pero además registra cada paso de la
+    eliminación (multiplicador usado y matriz resultante) para mostrar el
+    procedimiento completo, al estilo "f2 = f2 - m*f1".
+    """
+    n = A.shape[0]
+    U = A.astype(float).copy()
+    L = np.eye(n)
+    P = np.eye(n)
+    pasos = [{"texto": "Matriz inicial A", "matriz": U.copy()}]
+    for k in range(n - 1):
+        pivote = np.argmax(np.abs(U[k:, k])) + k
+        if pivote != k:
+            U[[k, pivote], :] = U[[pivote, k], :]
+            P[[k, pivote], :] = P[[pivote, k], :]
+            if k > 0:
+                L[[k, pivote], :k] = L[[pivote, k], :k]
+            pasos.append(
+                {"texto": f"Se intercambia f{k+1} ↔ f{pivote+1} (pivoteo parcial)",
+                 "matriz": U.copy()}
+            )
+        for i in range(k + 1, n):
+            if U[k, k] == 0:
+                continue
+            m = U[i, k] / U[k, k]
+            L[i, k] = m
+            U[i, k:] -= m * U[k, k:]
+            pasos.append(
+                {"texto": f"f{i+1} = f{i+1} − ({m:.4f})·f{k+1}", "matriz": U.copy()}
+            )
+    return P, L, U, pasos
+
+
 def lu_solve(A: np.ndarray, b: np.ndarray):
     """Resuelve Ax = b usando factorización LU con pivoteo parcial."""
     P, L, U = lu_decomposition(A)
@@ -355,6 +389,19 @@ Eₐ = |12500 − 12420| = 80 → Eᵣ = 80 / 12500 = 0.0064 → E% = 0.64 %.
             use_container_width=True,
         )
 
+        with st.expander("🔍 Ver procedimiento paso a paso (sustitución numérica)", expanded=True):
+            for _, fila in resultado.iterrows():
+                st.markdown(
+                    f"**{fila['Dato financiero']}**  \n"
+                    f"Eₐ = |{fila['Valor real']:.2f} − {fila['Valor aproximado']:.2f}| "
+                    f"= **{fila['Error absoluto (Eₐ)']:.4f}**  \n"
+                    f"Eᵣ = {fila['Error absoluto (Eₐ)']:.4f} / {fila['Valor real']:.2f} "
+                    f"= **{fila['Error relativo (Eᵣ)']:.6f}**  \n"
+                    f"E% = {fila['Error relativo (Eᵣ)']:.6f} × 100 "
+                    f"= **{fila['Error porcentual (E%)']:.4f} %**"
+                )
+                st.divider()
+
         fila_max = resultado.loc[resultado["Error porcentual (E%)"].idxmax()]
         st.warning(
             f"⚠️ El dato con **mayor error porcentual** es **{fila_max['Dato financiero']}** "
@@ -423,13 +470,15 @@ el capital en **t = 1.5 años** (valores de la guía original, editables abajo).
         t = st.number_input("Punto a estimar t (años)", value=1.5, step=0.1)
 
     if st.button("🧮 Calcular aproximaciones de Taylor", type="primary"):
-        from math import exp
+        from math import exp, factorial
 
         valor_exacto = P * exp(r * t)
+        h = t - t0
 
         filas = []
+        detalle_por_orden = {}
         for orden in (1, 2, 3):
-            aprox, _ = taylor_capital(P, r, t0, t, orden)
+            aprox, terminos = taylor_capital(P, r, t0, t, orden)
             ea, er, ep = calcular_errores(valor_exacto, aprox)
             filas.append(
                 {
@@ -439,6 +488,17 @@ el capital en **t = 1.5 años** (valores de la guía original, editables abajo).
                     "Error porcentual (%)": round(ep, 6),
                 }
             )
+            acumulado = np.cumsum(terminos)
+            detalle_por_orden[orden] = pd.DataFrame(
+                {
+                    "k": list(range(orden + 1)),
+                    "C⁽ᵏ⁾(t₀)": [P * exp(r * t0) * (r ** k) for k in range(orden + 1)],
+                    "k!": [factorial(k) for k in range(orden + 1)],
+                    "(t−t₀)ᵏ": [h ** k for k in range(orden + 1)],
+                    "Término": terminos,
+                    "Acumulado": acumulado,
+                }
+            )
         tabla_taylor = pd.DataFrame(filas)
         st.session_state.resumen["taylor"] = tabla_taylor
         st.session_state.resumen["valor_exacto_taylor"] = valor_exacto
@@ -446,6 +506,22 @@ el capital en **t = 1.5 años** (valores de la guía original, editables abajo).
         st.subheader("📊 Comparación de aproximaciones")
         st.metric("Valor exacto C(t)", f"{valor_exacto:,.4f}")
         st.dataframe(tabla_taylor, use_container_width=True)
+
+        with st.expander("🔍 Ver procedimiento paso a paso (término por término)", expanded=True):
+            st.markdown(f"h = t − t₀ = {t} − {t0} = **{h:.4f}**")
+            for orden, tabla_detalle in detalle_por_orden.items():
+                st.markdown(f"**Orden {orden}:** C(t) ≈ Σ C⁽ᵏ⁾(t₀)/k! · (t−t₀)ᵏ")
+                st.dataframe(
+                    tabla_detalle.style.format(
+                        {
+                            "C⁽ᵏ⁾(t₀)": "{:.6f}",
+                            "(t−t₀)ᵏ": "{:.6f}",
+                            "Término": "{:.6f}",
+                            "Acumulado": "{:.6f}",
+                        }
+                    ),
+                    use_container_width=True,
+                )
 
         mejor = tabla_taylor.loc[tabla_taylor["Error absoluto"].idxmin()]
 
@@ -607,29 +683,78 @@ iteración en lugar de esperar a la siguiente, por lo que normalmente converge m
                     {"Método": "Factorización LU", "x": x_lu,
                      "Iteraciones": "-", "Convergió": "-"}
                 )
-                with st.expander("Ver matrices L y U (factorización LU)"):
-                    st.write("**P (permutación)**")
-                    st.dataframe(pd.DataFrame(P))
-                    st.write("**L**")
-                    st.dataframe(pd.DataFrame(L).round(6))
-                    st.write("**U**")
-                    st.dataframe(pd.DataFrame(U).round(6))
+                _, _, _, pasos_lu = lu_decomposition_pasos(A)
+                Pb = P @ b
+                y = np.zeros(n)
+                for i in range(n):
+                    y[i] = Pb[i] - L[i, :i] @ y[:i]
+                x_back = np.zeros(n)
+                for i in range(n - 1, -1, -1):
+                    x_back[i] = (y[i] - U[i, i + 1:] @ x_back[i + 1:]) / U[i, i]
+
+                with st.expander("🔍 Ver procedimiento paso a paso (Factorización LU)"):
+                    st.markdown("**1. Eliminación gaussiana (A → U), registrando los multiplicadores:**")
+                    for paso in pasos_lu:
+                        st.markdown(f"_{paso['texto']}_")
+                        st.dataframe(pd.DataFrame(paso["matriz"]).round(4), use_container_width=True)
+                    st.markdown("**2. Matrices resultantes L y U (P·A = L·U):**")
+                    c_l, c_u = st.columns(2)
+                    with c_l:
+                        st.write("**L**")
+                        st.dataframe(pd.DataFrame(L).round(6), use_container_width=True)
+                    with c_u:
+                        st.write("**U**")
+                        st.dataframe(pd.DataFrame(U).round(6), use_container_width=True)
+                    st.markdown("**3. Sustitución hacia adelante — resuelve L·y = P·b:**")
+                    for i in range(n):
+                        resto = " − ".join(
+                            f"({L[i, j]:.4f}·{y[j]:.4f})" for j in range(i)
+                        ) or "0"
+                        st.markdown(f"y{i+1} = {Pb[i]:.4f} − ({resto}) = **{y[i]:.4f}**")
+                    st.markdown("**4. Sustitución hacia atrás — resuelve U·x = y:**")
+                    for i in range(n - 1, -1, -1):
+                        resto = " − ".join(
+                            f"({U[i, j]:.4f}·{x_back[j]:.4f})" for j in range(i + 1, n)
+                        ) or "0"
+                        st.markdown(
+                            f"x{i+1} = ({y[i]:.4f} − ({resto})) / {U[i, i]:.4f} = **{x_back[i]:.4f}**"
+                        )
             except Exception as e:
                 st.error(f"Error en LU: {e}")
 
         if "Jacobi" in metodos:
-            x_j, it_j, conv_j, _ = jacobi(A, b, x0, tol, int(max_iter))
+            x_j, it_j, conv_j, hist_j = jacobi(A, b, x0, tol, int(max_iter))
             resultados.append(
                 {"Método": "Jacobi", "x": x_j, "Iteraciones": it_j,
                  "Convergió": "Sí" if conv_j else "No"}
             )
+            with st.expander("🔍 Ver procedimiento paso a paso (Jacobi)"):
+                st.markdown(
+                    "Fórmula: xᵢ⁽ᵏ⁺¹⁾ = (bᵢ − Σⱼ≠ᵢ aᵢⱼ·xⱼ⁽ᵏ⁾) / aᵢᵢ  "
+                    "(siempre se usan los valores de la iteración **anterior**)."
+                )
+                tabla_hist_j = pd.DataFrame(
+                    hist_j, columns=[f"x{i+1}" for i in range(n)]
+                )
+                tabla_hist_j.insert(0, "Iteración", range(len(tabla_hist_j)))
+                st.dataframe(tabla_hist_j.round(6), use_container_width=True)
 
         if "Gauss-Seidel" in metodos:
-            x_gs, it_gs, conv_gs, _ = gauss_seidel(A, b, x0, tol, int(max_iter))
+            x_gs, it_gs, conv_gs, hist_gs = gauss_seidel(A, b, x0, tol, int(max_iter))
             resultados.append(
                 {"Método": "Gauss-Seidel", "x": x_gs, "Iteraciones": it_gs,
                  "Convergió": "Sí" if conv_gs else "No"}
             )
+            with st.expander("🔍 Ver procedimiento paso a paso (Gauss-Seidel)"):
+                st.markdown(
+                    "Fórmula: xᵢ⁽ᵏ⁺¹⁾ = (bᵢ − Σⱼ<ᵢ aᵢⱼ·xⱼ⁽ᵏ⁺¹⁾ − Σⱼ>ᵢ aᵢⱼ·xⱼ⁽ᵏ⁾) / aᵢᵢ  "
+                    "(usa los valores **ya actualizados** dentro de la misma iteración)."
+                )
+                tabla_hist_gs = pd.DataFrame(
+                    hist_gs, columns=[f"x{i+1}" for i in range(n)]
+                )
+                tabla_hist_gs.insert(0, "Iteración", range(len(tabla_hist_gs)))
+                st.dataframe(tabla_hist_gs.round(6), use_container_width=True)
 
         st.subheader("📊 Resultados")
         tabla_res = pd.DataFrame(
