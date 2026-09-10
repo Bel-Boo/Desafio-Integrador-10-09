@@ -819,9 +819,8 @@ elif pagina == "✅ Conclusión integradora":
     st.title("✅ Conclusión integradora")
     st.markdown(
         """
-**Pregunta guía:** ¿Puede un error pequeño en un dato financiero producir un cambio
-importante en el resultado final? Relaciona tu respuesta con los errores calculados,
-la aproximación de Taylor y el sistema mal condicionado.
+¿Puede un error pequeño en un dato financiero producir un cambio
+importante en el resultado final?
 """
     )
 
@@ -842,10 +841,10 @@ la aproximación de Taylor y el sistema mal condicionado.
             st.subheader(f"Resumen · Parte III ({resumen.get('sistema_escenario', '')})")
             st.dataframe(resumen["sistema"], use_container_width=True)
 
-    st.markdown("### 📝 Conclusión final (máximo 5 líneas)")
+    st.markdown("### 📝 Conclusión final")
     st.markdown(
         """
-Sí: un error pequeño en un dato financiero puede propagarse y producir un cambio
+Respuesta: un error pequeño en un dato financiero puede propagarse y producir un cambio
 importante en el resultado final. Los errores porcentuales de la Parte I ya son
 relevantes en términos relativos; la aproximación de Taylor confirma que truncar una
 serie introduce un error que crece con la distancia al punto de expansión; y el sistema
